@@ -5,8 +5,7 @@ pkg load retro_games;
 
 %funcs
 
-function imbar=barrier(im)
-  imgray = rgb2gray(im);
+function imbar=barrier(imgray)
   bar = imopen(imgray>40, ones(4));
   barn = bwlabel(bar);
   barreiras = regionprops(barn, 'Area');
@@ -20,6 +19,15 @@ function imbar=barrier(im)
   for i=1:numel(maior)
     imbar = imbar | barn == maior(i);
   end
+end
+
+function bolinhas=bolinha(imgray)
+  imgg= imgray>50;
+  im1 = imopen(imgg,ones(3));
+  bolinhas = (imgg & ~im1);
+  bolinhas = imerode(bolinhas, ones(2));
+  bolinhas = medfilt2(bolinhas);
+  bolinhas = imdilate(bolinhas,ones(3));
 end
 
 function jogo=inicio(jogo)
@@ -40,7 +48,8 @@ jogo=load_rom('Ms._Pac-Man.md');
 for i = 1:40
   jogo.step(5);
   im = jogo.get_image();
-  img = barrier(im);
+  imgray = rgb2gray(im);
+  img = bolinha(imgray);
   imshow(img);
   drawnow;
 end
