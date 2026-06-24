@@ -4,7 +4,7 @@ clc;
 clear controlador_mario;
 #warning off;
 
-graphics_toolkit("fltk");
+% graphics_toolkit("fltk");
 
 pkg load image;
 pkg load retro_games;
@@ -19,6 +19,7 @@ horizonte_barril = 30; % Horizonte de previsão dos barris
 
 % =====================================================
 % inicia jogo no momento ideal e salva esse momento
+
 [jogo, startpoint] = inicializar_emulador("DK.nes");
 % Cria a janela do jogo com um controle de estado para para o loop
 fig = figure('Name', 'Donkey Kong');
@@ -49,61 +50,15 @@ else
     % config grafica
     figure(fig);
     img_inicial = jogo.get_image();
+    MAX_SLOTS_VIS = 6; % Movido para cá
 
     if pc_view
-        % tela do jogo
-        subplot(1, 2, 1);
-        img_plot_pc = imshow(img_inicial);
-        title('Visão Normal');
-
-        % Visão do Computador
-        subplot(1, 2, 2);
-        imshow(mapa.plataformas);
-        title('PC View');
-        hold on;
-
-        % Desenha as escadas uma única vez
-        for i = 1:length(mapa.escadas_lista)
-            x_escada = mapa.escadas_lista(i).x_centro;
-            y_topo   = mapa.escadas_lista(i).y_topo;
-            y_base   = mapa.escadas_lista(i).y_base;
-            plot([x_escada, x_escada], [y_topo, y_base], 'g-', 'LineWidth', 2);
-            y_meio = (y_topo + y_base) / 2;
-            text(x_escada + 4, y_meio, num2str(i), 'Color', 'y', 'FontSize', 10, 'FontWeight', 'bold');
-        end
-
-        % Mario
-        mario_plot = plot(NaN, NaN, 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 8);
-
-        % Barris — posição atual
-        barris_plot = plot(NaN, NaN, 'o', ...
-            'MarkerEdgeColor', [1 0.5 0], 'MarkerFaceColor', [1 0.5 0], 'MarkerSize', 7);
-
-        % Trajetória prevista dos barris
-        MAX_SLOTS_VIS = 6;
-        
-        prev_plots = zeros(MAX_SLOTS_VIS, 1); 
-        
-        for s = 1:MAX_SLOTS_VIS
-            prev_plots(s) = plot(NaN, NaN, '--', 'Color', [1 0.65 0], 'LineWidth', 1.2);
-        end
-
-        % Ponto de impacto previsto 
-        impacto_plot = plot(NaN, NaN, 'x', ...
-            'Color', [1 0.2 0.2], 'MarkerSize', 10, 'LineWidth', 2);
-
-        % Foguinho
-        foguinho_plot = plot(NaN, NaN, 'o', ...
-            'MarkerEdgeColor', 'y', 'MarkerFaceColor', 'y', 'MarkerSize', 6);
-
-        % Texto com o estado atual do Mario (ANDANDO/PULANDO/NA_ESCADA)
-        texto_estado = text(5, 12, 'ANDANDO', 'Color', 'w', ...
-            'FontSize', 10, 'FontWeight', 'bold', 'BackgroundColor', [0 0 0]);
-
-        hold off;
+        % Chama a função que cria a tela e já devolve a struct de graficos pronta
+        graficos = inicializar_graficos_pc(img_inicial, mapa, MAX_SLOTS_VIS);
     else
         img_plot = imshow(img_inicial);
     end
+
     % =====================================================
     % configurações antes do loop
     frames_sem_mario = 0;
@@ -163,11 +118,11 @@ else
             clear rastreia_barril;
 
             if pc_view
-                set(mario_plot, 'XData', NaN, 'YData', NaN);
+                set(graficos.mario_plot, 'XData', NaN, 'YData', NaN);
                 for s = 1:MAX_SLOTS_VIS
-                    set(prev_plots(s), 'XData', NaN, 'YData', NaN);
+                    set(graficos.prev_plots(s), 'XData', NaN, 'YData', NaN);
                 end
-                set(impacto_plot, 'XData', NaN, 'YData', NaN);
+                set(graficos.impacto_plot, 'XData', NaN, 'YData', NaN);
             end
             continue;
         end
@@ -180,52 +135,7 @@ else
 
         % ===== render =====
         if pc_view
-            set(img_plot_pc, 'CData', imc);
-
-            % Mario
-            if frames_sem_mario < limite_sumido
-                set(mario_plot, 'XData', mx, 'YData', my);
-            else
-                set(mario_plot, 'XData', NaN, 'YData', NaN);
-            end
-
-            % Barris — posição atual
-            if ~isempty(bx)
-                set(barris_plot, 'XData', bx, 'YData', by);
-            else
-                set(barris_plot, 'XData', NaN, 'YData', NaN);
-            end
-
-            % Trajetórias previstas (uma linha por barril detectado)
-            imp_x_all = [];
-            imp_y_all = [];
-            for s = 1:MAX_SLOTS_VIS
-                if s <= length(bpx) && ~isempty(bpx{s})
-                    set(prev_plots(s), 'XData', bpx{s}, 'YData', bpy{s});
-                    % ponto de impacto = último ponto da trajetória
-                    imp_x_all(end+1) = bpx{s}(end);
-                    imp_y_all(end+1) = bpy{s}(end);
-                else
-                    set(prev_plots(s), 'XData', NaN, 'YData', NaN);
-                end
-            end
-            if ~isempty(imp_x_all)
-                set(impacto_plot, 'XData', imp_x_all, 'YData', imp_y_all);
-            else
-                set(impacto_plot, 'XData', NaN, 'YData', NaN);
-            end
-
-            % Foguinho
-            if ~isempty(fx)
-                set(foguinho_plot, 'XData', fx, 'YData', fy);
-            else
-                set(foguinho_plot, 'XData', NaN, 'YData', NaN);
-            end
-
-            % Estado atual do Mario
-            set(texto_estado, 'String', estado_mario.EstadoAtual);
-
-            drawnow;
+            atualizar_pc_view(graficos, imc, frames_sem_mario, limite_sumido, mx, my, bx, by, bpx, bpy, fx, fy, estado_mario.EstadoAtual, MAX_SLOTS_VIS);
         else
             set(img_plot, 'CData', img);
             drawnow;
